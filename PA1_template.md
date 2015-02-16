@@ -1,13 +1,9 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+# Reproducible Research: Peer Assessment 1
 
 
 ## Loading and preprocessing the data
-```{r, message=FALSE}
+
+```r
 knitr::opts_chunk$set(cache=TRUE, echo=TRUE) # Setting global options
 library(dplyr)
 library(lubridate)
@@ -34,26 +30,49 @@ totalStepsAvg <- mean(myDat$steps)
 
 
 ## What is mean total number of steps taken per day?
-```{r}
+
+```r
 totalStepsByDay <- summarise(byDayGrouping, totalSteps=sum(steps))
 hist(totalStepsByDay$totalSteps)
+```
 
+![](PA1_template_files/figure-html/unnamed-chunk-2-1.png) 
+
+```r
 stepsByDayTotalAvg <- mean(totalStepsByDay$totalSteps)
 print(paste("Mean total number of steps taken per day:", as.character(stepsByDayTotalAvg)))
+```
 
+```
+## [1] "Mean total number of steps taken per day: 10766.1886792453"
+```
+
+```r
 totalStepsMedian <- median(totalStepsByDay$totalSteps)
 print(paste("Median number of steps taken per day:", as.character(totalStepsMedian)))
+```
 
+```
+## [1] "Median number of steps taken per day: 10765"
 ```
 
 
 ## What is the average daily activity pattern?
-```{r}
-xyplot(steps ~ date, data = byDayGrouping[byDayGrouping$steps > 0,], type = "l", scales=list(x=list(rot=45)))
 
+```r
+xyplot(steps ~ date, data = byDayGrouping[byDayGrouping$steps > 0,], type = "l", scales=list(x=list(rot=45)))
+```
+
+![](PA1_template_files/figure-html/unnamed-chunk-3-1.png) 
+
+```r
 maxSteps <- max(byDayGrouping[byDayGrouping$steps > 0,]$steps)
 intervalWithMax <- byDayGrouping[byDayGrouping$steps == maxSteps,]$interval
 print(paste("Interval(s): ", intervalWithMax, ", Had the greates number of steps of: ", maxSteps, sep = ""))
+```
+
+```
+## [1] "Interval(s): 0615, Had the greates number of steps of: 806"
 ```
 
 
