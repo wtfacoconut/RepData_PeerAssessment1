@@ -19,6 +19,7 @@ myDat <- myDat[complete.cases(myDat),] # Removing incomplete cases
 myDat$date <- as.factor(myDat$date) # Setting the Date in the dataset as a factor
 
 # adding a column with a proper date-time stamp and another columns with just the time
+myDat$origInterval <- myDat$interval
 myDat$interval <- str_pad(myDat$interval, 4, pad = "0")
 myDat$time <- parse_date_time(paste(myDat$interval, "00", sep = ""), "%H%M%S")
 
@@ -26,7 +27,7 @@ myDat$dateTime <- paste(myDat$date, myDat$interval, sep = ":")
 myDat$dateTime <- parse_date_time(myDat$dateTime, "%y%m%d:%H%M")
 
 byDayGrouping <- group_by(myDat, date)
-byIntervalGrouping <- group_by(myDat, interval)
+byIntervalGrouping <- group_by(myDat, origInterval)
 
 totalSteps <- sum(myDat$steps)
 totalStepsAvg <- mean(myDat$steps)
@@ -48,8 +49,9 @@ print(paste("Median number of steps taken per day:", as.character(totalStepsMedi
 
 
 ## What is the average daily activity pattern?
-```{r}
-xyplot(steps ~ date, data = byDayGrouping[byDayGrouping$steps > 0,], type = "l", scales=list(x=list(rot=45)))
+```{r, fig.width=10}
+t1 <- summarise(byIntervalGrouping, stepsAvg=mean(steps))
+xyplot(stepsAvg ~ origInterval, data = t1, type = "l", scales=list(x=list(rot=45)))
 
 maxSteps <- max(byDayGrouping[byDayGrouping$steps > 0,]$steps)
 intervalWithMax <- byDayGrouping[byDayGrouping$steps == maxSteps,]$interval
