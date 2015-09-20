@@ -127,7 +127,7 @@ Below is the updated mean and median values. Day's which were previously ommited
 ```
 
 I decided to include one additional line plot to make it easier to see the difference between the number of steps between the weekday and weekend time periods below.  
-```{r combinedPlot, warning=F}
+```{r combinedPlot, warning=F, fig.width=15, fig.height= 10}
   ggplot(data=weekdayAvg, aes(interval,steps.mean, title="Overlay Plot of Average Weekday & Weekend Steps")) + geom_line(aes(colour="Weekday")) + geom_line(data = weekendAvg, aes(colour="Weekend")) + theme(legend.title=element_blank())
 ```
 
