@@ -1,66 +1,133 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "My Peer Review (1) Assignment"
+author: "Michael Snowden"
+date: "September 19, 2015"
+output: html_document
 ---
 
-
-## Loading and preprocessing the data
-```{r, message=FALSE}
-knitr::opts_chunk$set(cache=TRUE, echo=TRUE) # Setting global options
+```{r global_options,echo=T, warning=FALSE, message=F}
+knitr::opts_chunk$set(echo=T, warnings = F, message = F)
 library(dplyr)
-library(lubridate)
-library(stringr)
-library("lattice")
+library(ggplot2)
+library(doBy)
+library(chron)
+#library(cowplot)
+```
 
-myDat <- read.csv("activity.csv")
-myDat <- myDat[complete.cases(myDat),] # Removing incomplete cases
-myDat$date <- as.factor(myDat$date) # Setting the Date in the dataset as a factor
-
-# adding a column with a proper date-time stamp and another columns with just the time
-myDat$origInterval <- myDat$interval
-myDat$interval <- str_pad(myDat$interval, 4, pad = "0")
-myDat$time <- parse_date_time(paste(myDat$interval, "00", sep = ""), "%H%M%S")
-
-myDat$dateTime <- paste(myDat$date, myDat$interval, sep = ":")
-myDat$dateTime <- parse_date_time(myDat$dateTime, "%y%m%d:%H%M")
-
-byDayGrouping <- group_by(myDat, date)
-byIntervalGrouping <- group_by(myDat, origInterval)
-
-totalSteps <- sum(myDat$steps)
-totalStepsAvg <- mean(myDat$steps)
+---
+# Loading and Processing Data
+```{r loadingData}
+  inDataOrig <- read.csv("activity.csv")
+  
+  # Setting main DF variable to contain only complete cases
+  inData <- inDataOrig[complete.cases(inDataOrig),]
+  
+  # Creating a data frame with no NAs or invervals with 0 (zero) steps
+  inDataNoZeros <- inData[inData$steps > 0,]
+  
 ```
 
 
-## What is mean total number of steps taken per day?
-```{r}
-totalStepsByDay <- summarise(byDayGrouping, totalSteps=sum(steps))
-hist(totalStepsByDay$totalSteps)
 
-stepsByDayTotalAvg <- mean(totalStepsByDay$totalSteps)
-print(paste("Mean total number of steps taken per day:", as.character(stepsByDayTotalAvg)))
+Also there is an additional `r I(count(inData[inData$steps == 0,]))` cases/records were there there are 0 (zero) 'steps' for a given 'interval'. A seperate data frame is created to operate on where the number of steps taken per interval is greater than zero.
 
-totalStepsMedian <- median(totalStepsByDay$totalSteps)
-print(paste("Median number of steps taken per day:", as.character(totalStepsMedian)))
-
+# Mean Total Number of Steps Taken Per Day
+```{r avgMidTotal, warning=F}
+  # Summarizing the data set to a single data frame with mean, median, and total number of steps per day.
+  dataSummary <- summaryBy(steps ~ date, data = inData, FUN = list(mean, median, sum))
+  
+  # Total number of steps per day histogram
+  qplot(steps.sum, data=dataSummary, geom = "histogram")
 ```
 
+The list below shows a table of the meand and median steps per day.  
+*Please note:* 
+Every day of measurement, the number of intervals that contained zero steps was greater than 50%. Because of that every record in the "steps.median" column is zero.
+Per the TA's instruction, zero value intervals are to be factored in all calculations. [Link to TA's instruction](https://class.coursera.org/repdata-032/forum/thread?thread_id=69#comment-164)  
 
-## What is the average daily activity pattern?
-```{r, fig.width=10}
-t1 <- summarise(byIntervalGrouping, stepsAvg=mean(steps))
-xyplot(stepsAvg ~ origInterval, data = t1, type = "l", scales=list(x=list(rot=45)))
 
-maxSteps <- max(byDayGrouping[byDayGrouping$steps > 0,]$steps)
-intervalWithMax <- byDayGrouping[byDayGrouping$steps == maxSteps,]$interval
-print(paste("Interval(s): ", intervalWithMax, ", Had the greates number of steps of: ", maxSteps, sep = ""))
+```{r avgMidTotal2, warning=F}
+  print.data.frame(dataSummary[,-4], row.names = F)
 ```
 
+# Average Daily Pattern
+```{r dailyAvgPattern}
+  # 5 minute intervals averaged across all days
+  intervalAvg <- summaryBy(steps ~ interval, data = inData[,c(1,3)], FUN=mean)
+  ggplot(data=intervalAvg, aes(x=interval, y=steps.mean)) + geom_line()
+```
 
-## Imputing missing values
+The following interval contained the greatest number of steps across all days measured:
+```{r mostAvgStepsInterval, warning=F}
+  print.data.frame(intervalAvg[intervalAvg$steps.mean == max(intervalAvg$steps.mean),], row.names = F)
+```
 
+# Imputing Missing Values
+A total of `r I(sum(is.na(inDataOrig$steps)))` incomplete cases/records exist in the original data set which represents 8 days (about 13%) of missing data out of the 61 potentially observal days in the original data set.  
+  
+The strategy that's going to be used to fill in those missing (NA) values (for a given day), is going to be the to swap out all NAs with the calculated average number of steps for that interval. The justification for this is that there some days in which the entire day is filled with NA values. For example, if the calculated average number of steps for inverval "1565" is '56.2', then all NAs will be replaced by the average '56.2'.  
+This WILL have an effect on both mean and median values for all dates in the data set.
+```{r missingValues, warning=F}
+  # Making copt in to new data frame
+  inDataFull <- inDataOrig
+  
+  # Matching all NA rows to rows in 'intervalAvg' by interval value
+  t1 <- merge(inDataFull[is.na(inDataFull$steps),], intervalAvg, by="interval")
+  
+  # Rearranging by date then interval
+  t1 <- arrange(t1, date, interval) 
+  
+  # Rearranding columns and removing one non-needed column
+  t1 <- t1[,c(4,3,1)]
+  
+  # Replaving all NA values with interval average.
+  inDataFull[is.na(inDataFull$steps), "steps"] <- t1$steps.mean
+  rm(t1) # Removing temporary veriable from memory
+  
+  # Summarizing data by mean, median, and total
+  dataFullSummary <- summaryBy(steps ~ date, data = inDataFull, FUN = list(mean, median, sum))
+```
 
+The histogram below contains the previously ommited incomplete cases. The graph doesn't change much because there were only 8 days out of the 61 days (about 13%) recorded which didn't contain any data. 
+```{r missingValues2, warning=F}
+  # Total number of steps per day histogram
+  qplot(steps.sum, data=dataFullSummary, geom = "histogram")
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+Below is the updated mean and median values. Day's which were previously ommited to being filled with NA values are now shown below. Days in which there were no NA values were not effected.   
+```{r missingValues3, warning=F}
+  # Printing data frame with mean and median steps per day
+  print.data.frame(dataFullSummary[,c(1:3)], row.names = F)
+```
+
+# Differences in Activity Patterns Between Weekday and Weekend
+```{r weekEndWeekDay, warning=F}
+  #
+  dayOrEnd <- function(x){
+    if (is.weekend(as.Date(x))){
+      return("weekend")
+    }else{
+      return("weekday")
+    }
+  }
+  
+  inDataFull$weekDayOrEnd <- apply(inDataFull["date"], MARGIN = 1, FUN = dayOrEnd)
+  inDataFull$weekDayOrEnd <- as.factor(inDataFull$weekDayOrEnd)
+  
+  weekendAvg <- summaryBy(steps ~ interval, data = inDataFull[inDataFull$weekDayOrEnd == "weekend",], FUN=mean)
+  weekdayAvg <- summaryBy(steps ~ interval, data = inDataFull[inDataFull$weekDayOrEnd == "weekday",], FUN=mean)
+  
+  weekendPlot <- ggplot(data=weekendAvg, aes(x=interval, y=steps.mean)) + geom_line() + ggtitle("Weekend") + ylim(0, 250)
+  weekdayPlot <- ggplot(data=weekdayAvg, aes(x=interval, y=steps.mean)) + geom_line() + ggtitle("Weekday") + ylim(0, 250)
+```
+```{r weekEndWeekDayPlots, warning=F, echo=F}
+  weekendPlot
+  weekdayPlot
+  #plot_grid(weekendPlot, weekdayPlot, overlayPlot, ncol=1, rel_heights = 40)
+```
+
+I decided to include one additional line plot to make it easier to see the difference between the number of steps between the weekday and weekend time periods below.  
+```{r combinedPlot, warning=F}
+  ggplot(data=weekdayAvg, aes(interval,steps.mean, title="Overlay Plot of Average Weekday & Weekend Steps")) + geom_line(aes(colour="Weekday")) + geom_line(data = weekendAvg, aes(colour="Weekend")) + theme(legend.title=element_blank())
+```
+
